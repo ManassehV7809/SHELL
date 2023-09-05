@@ -6,7 +6,7 @@
 #include <stdbool.h>
 
 #define MAX_COMMANDS 100
-#define MAX_PATHS 10
+#define MAX_PATHS 100
 
 char *paths[MAX_PATHS] = {"/bin/"};  // Initial path
 char error_message[30] = "An error has occurred\n";
@@ -17,6 +17,12 @@ bool is_builtin(char *cmd) {
            strcmp(cmd, "cd") == 0 ||
            strcmp(cmd, "path") == 0;
 }
+
+
+void display_error() {
+    write(STDERR_FILENO, error_message, strlen(error_message));
+}
+
 
 int main(int argc, char *argv[]) {
     pid_t child;
@@ -33,15 +39,21 @@ int main(int argc, char *argv[]) {
         batch_mode = true;
         input_source = fopen(argv[1], "r");
         if (!input_source) {
-            write(STDERR_FILENO, error_message, strlen(error_message));
+           display_error();
+
             exit(1);
         }
     } else if (argc > 2) {
-        write(STDERR_FILENO, error_message, strlen(error_message));
+       display_error();
+
         exit(1);
     }
 
     while (1) {
+
+        if(!batch_mode){
+            printf("witsshell> ");
+        }
         if (getline(&lineptr, &n, input_source) == -1) {  
             if (batch_mode) {
                 fclose(input_source);  // Close batch file if in batch mode
@@ -62,26 +74,37 @@ int main(int argc, char *argv[]) {
         if (is_builtin(command[0])) {
             if (strcmp(command[0], "exit") == 0) {
                 if (command[1] != NULL) {
-                    write(STDERR_FILENO, error_message, strlen(error_message));
+                   display_error();
+
                 } else {
                     free(lineptr);
                     exit(0);
                 }
-            } else if (strcmp(command[0], "cd") == 0) {
-                if (command[1] == NULL || command[2] != NULL) {
-                    write(STDERR_FILENO, error_message, strlen(error_message));
-                } else {
-                    if (chdir(command[1]) != 0) {
-                        write(STDERR_FILENO, error_message, strlen(error_message));
-                    }
-                }
-            } else if (strcmp(command[0], "path") == 0) {
+            }
+    else if (strcmp(command[0], "cd") == 0) {
+    bool error_flag = false;
+    
+    if (command[1] == NULL || command[2] != NULL) {
+        error_flag = true;
+    } else {
+        if (chdir(command[1]) != 0) {  // Attempt to change directory
+            error_flag = true;  // Set the error flag if chdir fails
+        }
+    }
+    
+    if (error_flag) {
+        display_error();
+    }
+}
+
+
+ else if (strcmp(command[0], "path") == 0) {
                 path_count = 0;
                 for (int j = 1; j < MAX_COMMANDS && command[j] != NULL; j++) {
                     paths[path_count++] = command[j];
                 }
             }
-            continue;
+ continue;
         }
 
         char full_command[512];
@@ -96,20 +119,22 @@ int main(int argc, char *argv[]) {
         }
 
         if (!command_found) {
-            write(STDERR_FILENO, error_message, strlen(error_message));
+           display_error();
             continue;
         }
 
         child = fork();
         if (child == -1) {
-            write(STDERR_FILENO, error_message, strlen(error_message));
+display_error();
+
             free(lineptr);
             exit(EXIT_FAILURE);
         }
 
         if (child == 0) {
             if (execv(full_command, command) == -1) {
-                write(STDERR_FILENO, error_message, strlen(error_message));
+               display_error();
+
                 exit(EXIT_FAILURE);
             }
         } else {
