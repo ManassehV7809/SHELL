@@ -17,7 +17,7 @@ bool is_builtin(char *cmd) {
            strcmp(cmd, "path") == 0;
 }
 
-int main(int argc, char *argv[], char *envp[]) {
+int main(int argc, char *argv[]) {
     pid_t child;
     char *command[MAX_COMMANDS], *token, *lineptr = NULL; 
     size_t n;
