@@ -1,3 +1,2 @@
-An error has occurred
-An error has occurred
-An error has occurred
+free(): invalid pointer
+tester/run-tests.sh: line 29: 557813 Aborted                 ./witsshell tests/22.in

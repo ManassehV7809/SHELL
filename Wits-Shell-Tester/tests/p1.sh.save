@@ -1,0 +1,4 @@
+#! /bin/bash
+cd p2a-test
+ls
+

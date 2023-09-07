@@ -1,1 +1,0 @@
-tester/run-tests.sh: line 29:  5503 Segmentation fault      ./witsshell tests/21.in
