@@ -1,2 +1,0 @@
-free(): invalid pointer
-tester/run-tests.sh: line 29: 557768 Aborted                 ./witsshell tests/17.in

@@ -9,14 +9,27 @@
 #include <sys/stat.h>
 
 #define MAX_COMMANDS 100
-#define MAX_PATHS 100
 
-char *paths[MAX_PATHS] = {"/bin/"};  
 char error_message[30] = "An error has occurred\n";
-int path_count = 1;
-
 pid_t children[MAX_COMMANDS];
 int child_count = 0;
+typedef struct Node {
+    char* path;
+    struct Node* next;
+} Node;
+
+Node* createNode(const char* pathValue) {
+    Node* newNode = (Node*) malloc(sizeof(Node));
+    if (!newNode) {
+        exit(1);
+    }
+    newNode->path = strdup(pathValue); // Duplicate the string for storage
+    newNode->next = NULL;
+    return newNode;
+}
+
+Node* paths_head = NULL;
+
 
 bool is_builtin(char *cmd) {
     return strcmp(cmd, "exit") == 0 ||
@@ -29,23 +42,33 @@ void display_error() {
 }
 
 void freePaths() {
-    for (int i = 0; i < path_count; i++) {
-        free(paths[i]);
+    Node* current = paths_head;
+    Node* next;
+    while (current != NULL) {
+        next = current->next;
+        free(current->path);
+        free(current);
+        current = next;
     }
-    path_count = 0;
+    paths_head = NULL;
 }
 
+
 void addPathWithSlash(char *path) {
+    Node* newNode = malloc(sizeof(Node));
     size_t len = strlen(path);
+
     if (path[len - 1] == '/') {
-        paths[path_count++] = strdup(path);
+        newNode->path = strdup(path);
     } else {
-        char *newPath = malloc(len + 2);  
-        strcpy(newPath, path);
-        strcat(newPath, "/");
-        paths[path_count++] = newPath;
+        newNode->path = malloc(len + 2);  
+        strcpy(newNode->path, path);
+        strcat(newNode->path, "/");
     }
+    newNode->next = paths_head;
+    paths_head = newNode;
 }
+
 void execute_command(char **command) {
     if (!command[0]) return;
 
@@ -145,15 +168,18 @@ void execute_command(char **command) {
                 }
             }
 
-            char full_command[512];
-            bool command_found = false;
-            for (int j = 0; j < path_count; j++) {
-                snprintf(full_command, sizeof(full_command), "%s%s", paths[j], command[0]);
-                if (access(full_command, X_OK) == 0) {
-                    command_found = true;
-                    break;
-                }
-            }
+                        char full_command[512];
+                        bool command_found = false;
+                        Node* current_path = paths_head;
+                        while (current_path) {
+                            snprintf(full_command, sizeof(full_command), "%s%s", current_path->path, command[0]);
+                            if (access(full_command, X_OK) == 0) {
+                                command_found = true;
+                                break;
+                            }
+                            current_path = current_path->next;
+                        }
+
             if (!command_found) {
                 display_error();
                 exit(1);
@@ -173,6 +199,10 @@ void execute_command(char **command) {
 
 
 int main(int argc, char *argv[]) {
+    if (!paths_head) {
+    paths_head = createNode("/bin/");
+}
+
     char *command[MAX_COMMANDS], *token, *lineptr = NULL;
     size_t n;
     char *saveptr;
