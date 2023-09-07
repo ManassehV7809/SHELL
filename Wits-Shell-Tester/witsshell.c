@@ -69,6 +69,42 @@ void addPathWithSlash(char *path) {
     paths_head = newNode;
 }
 
+// Modified tokenization to handle commands combined with '&'
+void tokenize_commands(char* line, char*** commands, int* command_count) {
+    char** result = (char**)malloc(MAX_COMMANDS * sizeof(char*));
+    char* cmd_start = line;
+    int cmd_idx = 0;
+    
+    for (char* ptr = line; ; ++ptr) {
+        if (*ptr == '&' || *ptr == '\0' || *ptr == '\n') {
+            if (ptr > cmd_start) {
+                int length = ptr - cmd_start;
+                char* command = (char*)malloc((length + 1) * sizeof(char));
+                strncpy(command, cmd_start, length);
+                command[length] = '\0';
+                result[cmd_idx++] = command;
+            }
+            
+            if (*ptr == '\0' || *ptr == '\n') {
+                break;
+            }
+            cmd_start = ptr + 1; 
+        }
+    }
+    
+    result[cmd_idx] = NULL;  // NULL-terminate the list of commands
+    *commands = result;
+    *command_count = cmd_idx;
+}
+
+void free_commands(char*** commands) {
+    for (int i = 0; (*commands)[i] != NULL; ++i) {
+        free((*commands)[i]);
+    }
+    free(*commands);
+    *commands = NULL;
+}
+
 void execute_command(char **command) {
     if (!command[0]) return;
 
@@ -198,15 +234,14 @@ void execute_command(char **command) {
 
 
 
+
 int main(int argc, char *argv[]) {
     if (!paths_head) {
-    paths_head = createNode("/bin/");
-}
+        paths_head = createNode("/bin/");
+    }
 
-    char *command[MAX_COMMANDS], *token, *lineptr = NULL;
+    char* lineptr = NULL;
     size_t n;
-    char *saveptr;
-
     FILE *input_source = stdin;
     bool batch_mode = false;
 
@@ -222,43 +257,47 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-   while (1) {
-    if (!batch_mode) {
-        printf("witsshell> ");
-    }
-    if (getline(&lineptr, &n, input_source) == -1) {
-        if (batch_mode) {
-            fclose(input_source);
+    while (1) {
+        if (!batch_mode) {
+            printf("witsshell> ");
         }
-        free(lineptr);
-        exit(0);
-    }
-
-    int cmd_idx = 0;
-    token = strtok_r(lineptr, " \t\n\r", &saveptr);
-    while (token != NULL) {
-        if (strcmp(token, "&") == 0) {
-            command[cmd_idx] = NULL;
-            execute_command(command);
-            cmd_idx = 0;
-        } else {
-            command[cmd_idx++] = token;
+        if (getline(&lineptr, &n, input_source) == -1) {
+            if (batch_mode) {
+                fclose(input_source);
+            }
+            free(lineptr);
+            exit(0);
         }
-        token = strtok_r(NULL, " \t\n\r", &saveptr);
-    }
-    command[cmd_idx] = NULL;
 
-    if (cmd_idx > 0) {  // If there's any command left after the last `&`
-        execute_command(command);
-    }
+        char** commands = NULL;
+        int command_count = 0;
+        tokenize_commands(lineptr, &commands, &command_count);
 
-    while (child_count > 0) {
-        wait(NULL);
-        child_count--;
-    }
-}
+        for (int i = 0; i < command_count; ++i) {
+            char* command_tokens[MAX_COMMANDS];
+            int cmd_idx = 0;
+            char* token;
+            char* saveptr;
+            
+            token = strtok_r(commands[i], " \t\n\r", &saveptr);
+            while (token != NULL) {
+                command_tokens[cmd_idx++] = token;
+                token = strtok_r(NULL, " \t\n\r", &saveptr);
+            }
+            
+            command_tokens[cmd_idx] = NULL;
+            execute_command(command_tokens);
+        }
 
+        free_commands(&commands);
+
+        while (child_count > 0) {
+            wait(NULL);
+            child_count--;
+        }
+    }
 
     free(lineptr);
     return 0;
 }
+
